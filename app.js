@@ -119,15 +119,15 @@ app.post('/search', async (req, res) => {
             if (Array.isArray(resultData) && resultData.length > 0) {
                 // Flattening the nested arrays
                 const leads = resultData.flat();
-
+// isJustdial: place.site && place.site.includes('justdial.com') ? 'Yes' : 'No',
+// isTripadvisor: place.site && place.site.includes('tripadvisor.com') ? 'Yes' : 'No',
                 // Extract relevant data
                 let scrapedData = leads.map(place => ({
                     name: place.name || 'N/A',
                     phone: place.phone || 'N/A',
                     website: place.site || 'N/A',
                     photosCount: place.photos_count || 0,
-                    isJustdial: place.site && place.site.includes('justdial.com') ? 'Yes' : 'No',
-                    isTripadvisor: place.site && place.site.includes('tripadvisor.com') ? 'Yes' : 'No',
+                    
                     locationLink: place.location_link || '#',
                     address: place.full_address || 'N/A',
                     rating: place.rating || 'N/A'
@@ -169,35 +169,67 @@ app.post('/search', async (req, res) => {
 });
 
 // Route to export the leads data to Excel
-app.get('/export', (req, res) => {
+const ExcelJS = require('exceljs');
+
+
+app.get('/export', async (req, res) => {
     const leadsFilePath = 'leadsData.json';
 
-    // Check if the leadsData.json file exists
-    if (fs.existsSync(leadsFilePath)) {
-        const leads = JSON.parse(fs.readFileSync(leadsFilePath, 'utf-8'));
-
-        // Convert the scraped data to a format suitable for Excel
-        const wb = xlsx.utils.book_new();
-        const ws = xlsx.utils.json_to_sheet(leads);
-        xlsx.utils.book_append_sheet(wb, ws, 'Leads');
-
-        // Set the file path to save the Excel file
-        const filePath = path.join(__dirname, 'leadsData.xlsx');
-
-        // Write to Excel file
-        xlsx.writeFile(wb, filePath);
-
-        // Send the file to the client for download
-        res.download(filePath, 'leadsData.xlsx', (err) => {
-            if (err) {
-                console.error('Error downloading the file:', err);
-            }
-            fs.unlinkSync(filePath); // Optionally delete the file after sending it
-        });
-    } else {
-        res.status(404).send('No leads data found');
+    if (!fs.existsSync(leadsFilePath)) {
+        return res.status(404).send('No leads data found');
     }
+
+    const leads = JSON.parse(fs.readFileSync(leadsFilePath, 'utf-8'));
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Leads');
+
+    // Define headers from keys
+    const headers = Object.keys(leads[0]);
+
+    // Create styled header row
+    sheet.addRow(headers);
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF1F497D' } // dark blue
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+            top: { style: 'thin' },
+            bottom: { style: 'thin' },
+            left: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+    });
+
+    // Add data rows with centered alignment
+    leads.forEach((lead) => {
+        const row = sheet.addRow(headers.map(h => lead[h]));
+        row.eachCell((cell) => {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+    });
+
+    // Auto-adjust column widths
+    sheet.columns.forEach((col, i) => {
+        const maxLength = Math.max(
+            headers[i].length,
+            ...sheet.getColumn(i + 1).values.map(val => (val ? val.toString().length : 0))
+        );
+        col.width = maxLength + 4;
+    });
+
+    const filePath = path.join(__dirname, 'leadsData.xlsx');
+    await workbook.xlsx.writeFile(filePath);
+
+    res.download(filePath, 'leadsData.xlsx', (err) => {
+        if (!err) fs.unlinkSync(filePath);
+    });
 });
+
 
 
 
