@@ -46,8 +46,8 @@ app.get('/', (req, res) => {
 
 // Route to handle the search and scrape data
 app.post('/search', async (req, res) => {
-    const { query, limit } = req.body;
-
+    const { name,area, limit } = req.body;
+    const query=name+" "+area
     try {
         // Initiate the search
         const response = await client.googleMapsSearch(query, limit, { language: 'en', region: 'IN' });
@@ -198,6 +198,9 @@ app.get('/export', (req, res) => {
         res.status(404).send('No leads data found');
     }
 });
+
+
+
 app.post('/clear', (req, res) => {
     fs.writeFileSync('leadsData.json', JSON.stringify([], null, 2)); // Clear by writing empty array
     res.redirect('/'); // After clearing, redirect back to home
