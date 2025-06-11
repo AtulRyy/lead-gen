@@ -180,46 +180,59 @@ app.get('/export', async (req, res) => {
     }
 
     const leads = JSON.parse(fs.readFileSync(leadsFilePath, 'utf-8'));
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Leads');
 
-    // Define headers from keys
+    // Get headers and format them
     const headers = Object.keys(leads[0]);
+    const capitalizedHeaders = headers.map(h =>
+        h.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    );
 
-    // Create styled header row
-    sheet.addRow(headers);
+    // Add styled header row
+    sheet.addRow(capitalizedHeaders);
     const headerRow = sheet.getRow(1);
     headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.font = { bold: true };
         cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FF1F497D' } // dark blue
+            fgColor: { argb: 'CFE2F3' } // Light purple
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = {
             top: { style: 'thin' },
-            bottom: { style: 'thin' },
             left: { style: 'thin' },
+            bottom: { style: 'thin' },
             right: { style: 'thin' }
         };
     });
 
-    // Add data rows with centered alignment
+    // Add data rows and center-align all cells
     leads.forEach((lead) => {
         const row = sheet.addRow(headers.map(h => lead[h]));
-        row.eachCell((cell) => {
+        row.eachCell(cell => {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
         });
     });
 
     // Auto-adjust column widths
-    sheet.columns.forEach((col, i) => {
-        const maxLength = Math.max(
-            headers[i].length,
-            ...sheet.getColumn(i + 1).values.map(val => (val ? val.toString().length : 0))
-        );
-        col.width = maxLength + 4;
+    sheet.columns.forEach((column, index) => {
+        let maxLength = capitalizedHeaders[index].length;
+        column.eachCell({ includeEmpty: true }, cell => {
+            if (cell.value) {
+                const length = cell.value.toString().length;
+                if (length > maxLength) maxLength = length;
+            }
+        });
+        column.width = maxLength + 4;
     });
 
     const filePath = path.join(__dirname, 'leadsData.xlsx');
@@ -229,7 +242,6 @@ app.get('/export', async (req, res) => {
         if (!err) fs.unlinkSync(filePath);
     });
 });
-
 
 
 
